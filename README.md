@@ -49,7 +49,7 @@ $ python name_test.py
 which will create ```charcnn.pth```.
 
 ### Deploying your Deep Learning algorithm onto EC2
-Copy all the files from ```flaskapp/`` and the ```tf_charcnn.h5``` model into ```/var/www/html/flaskapp``` (and ```charcnn.pth``` if you're testing out the PyTorch version). ```flaskapp.py``` contains the web service calls, which can be modified as necessary.  In its present state, it contains the following:
+Copy all the files from ```flaskapp/``` and the ```tf_charcnn.h5``` model into ```/var/www/html/flaskapp``` (and ```charcnn.pth``` if you're testing out the PyTorch version). ```flaskapp.py``` contains the web service calls, which can be modified as necessary.  In its present state, it contains the following:
 ```python
 from flask import Flask, render_template
 import namecnn
