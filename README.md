@@ -24,10 +24,10 @@ To allow for dynamic content onto the page, add the following lines to ```/etc/a
 
         <Directory flaskapp>
             WSGIProcessGroup flaskapp
-                WSGIApplicationGroup %{GLOBAL}
-                    Order deny,allow
-                        Allow from all
-                        </Directory>
+            WSGIApplicationGroup %{GLOBAL}
+            Order deny,allow
+            Allow from all
+        </Directory>
 ```
 ```flaskapp``` can be replaced with whatever you'd like to call your application.  In the ```/var/www/html``` area, create the ```flaskapp``` directory, which is where your python code will eventually go.  You'll need to add the ```flaskapp.wsgi``` file containing the following:
 ```python
