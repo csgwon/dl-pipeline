@@ -14,10 +14,7 @@ def predict(name):
     return labels[index.data.tolist()[0]]
 
 
-name_data = pd.read_csv('data/names/names_train_new.csv', sep='\t')
-name_data = name_data.dropna()
-
-charcnn = CharCNN(n_classes=len(set(name_data['label'])), vocab_size=len(chars), max_seq_length=max_name_len)
+charcnn = CharCNN(n_classes=len(labels), vocab_size=len(chars), max_seq_length=max_name_len)
 charcnn.load_state_dict(torch.load('charcnn.pth'))
 
 charcnn.train(False)
