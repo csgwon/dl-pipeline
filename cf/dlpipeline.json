@@ -3,19 +3,21 @@
     "CIDRRange": {
       "Description": "VPCCIDR Range (will be a /16 block)",
       "Type": "String",
-      "Default": "10.0.0.0"
+      "Default": "10.0.0.0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
     },
     "ResourcePrefix": {
       "Description": "Prefix used for all resources in stack",
-      "Type": "String"
+      "Type": "String",
+      "Default": "DLPipeline"
     },
-    "AllowedCIDR": {
-      "Description": "Whitelisted CIDR block for security group",
+    "AllowedIP": {
+      "Description": "Whitelisted CIDR block for security group (must be of the form x.x.x.x)",
       "Type": "String",
       "MinLength": "9",
       "MaxLength": "18",
-      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
-      "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x"
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
+      "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x"
     },
     "KeyName": {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
@@ -37,9 +39,9 @@
       }
     },
     "AWSRegion2AMI" : {
-      "us-east-1"      : {"Xenial": "ami-1d4e7a66"},
-      "us-west-2"      : {"Xenial": "ami-8803e0f0"},
-      "us-west-1"      : {"Xenial": "ami-969ab1f6"}
+      "us-east-1" : {"Xenial": "ami-1d4e7a66"},
+      "us-west-2" : {"Xenial": "ami-8803e0f0"},
+      "us-west-1" : {"Xenial": "ami-969ab1f6"}
     }
   },
   "Resources": {
@@ -60,8 +62,8 @@
         "GroupDescription": "Enable inbound network access access to EC2 instance.",
         "VpcId": { "Ref": "VPCBase" },
         "SecurityGroupIngress": [
-          {"IpProtocol": "tcp", "ToPort": "80", "FromPort": "80", "CidrIp": {"Ref": "AllowedCIDR"}},
-          {"IpProtocol": "tcp", "ToPort": "22", "FromPort": "22", "CidrIp": {"Ref": "AllowedCIDR"}}
+          {"IpProtocol": "tcp", "ToPort": "80", "FromPort": "80", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "AllowedIP"}, "/32"]] }},
+          {"IpProtocol": "tcp", "ToPort": "22", "FromPort": "22", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "AllowedIP"}, "/32"]] }}
         ],
         "Tags" : [
           { "Key": "Name", "Value": { "Fn::Join" : ["", [{ "Ref" : "ResourcePrefix" }, "-SG"]] } }
@@ -120,14 +122,24 @@
         "RouteTableId" : { "Ref" : "RouteTablePublic" }
       }
     },
-    "Ec2Instance" : {
+    "WebServer" : {
       "Type" : "AWS::EC2::Instance",
-      "Properties" : {
+     "Properties" : {
         "ImageId" : { "Fn::FindInMap" : [ "AWSRegion2AMI", { "Ref" : "AWS::Region" }, "Xenial"]},
         "InstanceType" : {"Ref": "InstanceType"},
         "SecurityGroupIds": [ {"Ref" : "InstanceSecurityGroup"} ],
         "KeyName" : {"Ref": "KeyName"},
-        "SubnetId" : {"Ref": "PublicSubnet"}
+        "SubnetId" : {"Ref": "PublicSubnet"},
+        "UserData": {
+          "Fn::Base64": { "Fn::Join":["", [
+            "#!/bin/bash -ex\n",
+            "apt-get -y update\n",
+            "apt-get -y install apache2 libapache2-mod-wsgi python python-pip\n",
+            "pip install flask pandas h5py tensorflow keras\n",
+            "pip install http://download.pytorch.org/whl/cu75/torch-0.2.0.post1-cp27-cp27mu-manylinux1_x86_64.whl\n",
+            "pip install torchvision"
+          ]]}
+        }
       }
     }
   },
