@@ -41,7 +41,7 @@ Begin with your favorite deep learning algorithm.  For starters, I borrowed one 
 Install Pandas, Tensorflow, Keras (and optionally PyTorch) with the following commands:
 
 ```sh
-$ sudo pip install pandas tensorflow keras
+$ sudo pip install pandas tensorflow keras h5py
 $ pip install http://download.pytorch.org/whl/cu75/torch-0.2.0.post1-cp27-cp27mu-manylinux1_x86_64.whl
 $ pip install torchvision
 ```
