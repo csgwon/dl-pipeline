@@ -34,6 +34,10 @@
     "Owner": {
       "Description": "Your Name",
       "Type": "String"
+    },
+    "S3BucketName": {
+      "Description": "S3 bucket for setting up lambda trigger (choose a unique name)",
+      "Type": "String"
     }
   },
   "Mappings": {
@@ -67,6 +71,7 @@
         "GroupDescription": "Enable inbound network access access to EC2 instance.",
         "VpcId": { "Ref": "VPCBase" },
         "SecurityGroupIngress": [
+          {"IpProtocol": "tcp", "ToPort": "80", "FromPort": "80", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "CIDRRange"}, "/16"]] }},
           {"IpProtocol": "tcp", "ToPort": "80", "FromPort": "80", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "AllowedIP"}, "/32"]] }},
           {"IpProtocol": "tcp", "ToPort": "22", "FromPort": "22", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "AllowedIP"}, "/32"]] }}
         ],
@@ -181,7 +186,7 @@
             "#!/bin/bash -ex\n",
             "apt-get -y update\n",
             "apt-get -y install apache2 libapache2-mod-wsgi python python-pip\n",
-            "pip install flask pandas h5py tensorflow keras\n",
+            "pip install flask pandas h5py tqdm tensorflow keras\n",
             "pip install http://download.pytorch.org/whl/cu75/torch-0.2.0.post1-cp27-cp27mu-manylinux1_x86_64.whl\n",
             "pip install torchvision"
           ]]}
@@ -191,6 +196,175 @@
           { "Key": "Owner", "Value":  { "Ref" : "Owner" } }
         ]
 
+      }
+    },
+    "LambdaRole" : {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [ {
+            "Effect": "Allow",
+            "Principal": {
+              "Service": [ "lambda.amazonaws.com" ]
+            },
+            "Action": [ "sts:AssumeRole" ]
+          } ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "S3Access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [ {
+                "Effect": "Allow",
+                "Action": "s3:*",
+                "Resource": "*"
+              } ]
+            }
+          },
+          {
+            "PolicyName": "EC2Access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [ 
+                {
+                  "Action": "ec2:*",
+                  "Effect": "Allow",
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "elasticloadbalancing:*",
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "cloudwatch:*",
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "autoscaling:*",
+                  "Resource": "*"
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "LambdaExecute",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [ {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogGroup",
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": "*"
+              } ]
+            }
+          }
+        ]
+      }
+    },
+    "LambdaInstanceProfile" : {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [ {
+          "Ref": "LambdaRole"
+        } ]
+      }
+    },
+    "NameLambda" : {
+      "Type" : "AWS::Lambda::Function",
+      "Properties": {
+        "Description": "Determine nationality of file in S3 based on name",
+        "FunctionName": "DLPipelineFunction",
+        "Handler": "index.lambda_handler",
+        "Runtime": "python2.7",
+        "Role": { "Fn::GetAtt" : ["LambdaRole", "Arn"] },
+        "VpcConfig" : {
+          "SecurityGroupIds": [ {"Ref": "InstanceSecurityGroup"} ],
+          "SubnetIds": [ {"Ref": "PublicSubnet"} ]
+        },
+        "Code": {
+          "ZipFile": { "Fn::Join": ["", [
+            "import json\n",
+            "import urllib\n",
+            "import boto3\n",
+            "s3 = boto3.client('s3')\n",
+            "def lambda_handler(event, context):\n",
+            "  bucket = event['Records'][0]['s3']['bucket']['name']\n",
+            "  key = urllib.unquote_plus(event['Records'][0]['s3']['object']['key'].encode('utf8'))\n",
+            "  response = s3.get_object(Bucket=bucket, Key=key)\n",
+            "  name = response['Body'].read().strip()\n",
+            "  nationality = urllib.urlopen(\"http://", { "Fn::GetAtt": [ "WebServer", "PublicDnsName" ] }, "/name_tf/\"+name).read()\n",
+            "  s3.put_object(Bucket=bucket, Key='out_'+key, Body=nationality)\n",
+            "  return nationality\n"
+          ] ] }
+        }
+      }
+    },
+    "S3LambdaPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "Action": "lambda:InvokeFunction",
+        "FunctionName": {"Ref": "NameLambda"},
+        "Principal": "s3.amazonaws.com",
+        "SourceAccount": {"Ref": "AWS::AccountId"},
+        "SourceArn": { "Fn::Join": [":", [
+          "arn", "aws", "s3", "", "", {"Ref": "S3BucketName"}
+        ] ] }
+      }
+    },
+    "DLS3Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": { "Ref": "S3BucketName" },
+        "NotificationConfiguration": {
+          "LambdaConfigurations": [{
+            "Function": {"Fn::GetAtt": ["NameLambda", "Arn"]},
+            "Event": "s3:ObjectCreated:*",
+            "Filter": {
+              "S3Key": {
+                "Rules": [
+                {
+                  "Name": "suffix",
+                  "Value": ".txt"
+                },
+                {
+                  "Name": "prefix",
+                  "Value": "name_"
+                } ]
+              }
+            }
+          }]
+        },
+        "Tags" : [
+          { "Key": "Name", "Value": { "Fn::Join" : ["", [{ "Ref" : "ResourcePrefix" }, "-S3"]] } },
+          { "Key": "Owner", "Value":  { "Ref" : "Owner" } }
+        ]
+      }
+    },
+    "S3Endpoint": {
+      "Type" : "AWS::EC2::VPCEndpoint",
+      "Properties" : {
+        "PolicyDocument" : {
+          "Version":"2012-10-17",
+          "Statement":[{
+            "Effect":"Allow",
+            "Principal": "*",
+            "Action":["s3:*"],
+            "Resource":[ { "Fn::Join": [ "", [ "arn:aws:s3:::", {"Ref": "S3BucketName"}, "/*" ] ] } ]
+          }]
+        },
+        "RouteTableIds" : [ {"Ref": "RouteTablePublic"} ],
+        "ServiceName" : { "Fn::Join": [ "", [ "com.amazonaws.", { "Ref": "AWS::Region" }, ".s3" ] ] },
+        "VpcId" : {"Ref" : "VPCBase"}
       }
     }
   },
