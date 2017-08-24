@@ -14,7 +14,7 @@ I started with the Ubuntu 16.04 LTS (HVM) AMI running on a t2.xlarge (probably o
 ```sh
 $ sudo apt-get -y update
 $ sudo apt-get -y install apache2 libapache2-mod-wsgi
-$ sudo apt-get -y instasll python python-pip
+$ sudo apt-get -y install python python-pip
 $ sudo pip install flask
 ```
 To allow for dynamic content onto the page, add the following lines to ```/etc/apache2/sites-enabled/000-default.conf``` after ```DocumentRoot /var/www/html```:
@@ -36,7 +36,15 @@ sys.path.insert(0,'/var/www/html/flaskapp')
 from flaskapp import app as application
 ```
 ### Train your favorite Deep Learning algorithm
-Begin with your favorite deep learning algorithm.  For starters, I borrowed one from a [JoostWare] (https://github.com/joosthub/pytorch-nlp-tutorial).  Whereas I'm a big advocate of PyTorch, it would mysteriously hang on me when deployed with Apache with mod_wsgi (works fine locally with Flask alone).  Because of that, I created a Keras version as well.  I'm including both in case someone could shed insights as to why the PyTorch one hangs.  The versions I'm using are PyTorch 0.2.0.1, Tensorflow 1.2.1, and Keras 2.0.6.
+Begin with your favorite deep learning algorithm.  For starters, I borrowed one from a [JoostWare](https://github.com/joosthub/pytorch-nlp-tutorial).  Whereas I'm a big advocate of PyTorch, it would mysteriously hang on me when deployed with Apache with mod_wsgi (works fine locally with Flask alone).  Because of that, I created a Keras version as well.  I'm including both in case someone could shed insights as to why the PyTorch one hangs.  The versions I'm using are PyTorch 0.2.0.1, Tensorflow 1.2.1, and Keras 2.0.6.
+
+Install Pandas, Tensorflow, Keras (and optionally PyTorch) with the following commands:
+
+```sh
+$ sudo pip install pandas tensorflow keras h5py
+$ pip install http://download.pytorch.org/whl/cu75/torch-0.2.0.post1-cp27-cp27mu-manylinux1_x86_64.whl
+$ pip install torchvision
+```
 
 Each model takes about ~15 min to train on a t2.xlarge (~3 min on a p2.xlarge) and achieves ~93-97% accuracy on the test set.  To generate models, go into the ```train/``` directory and run the following for Tensorflow:
 ```sh
