@@ -1,4 +1,5 @@
 {
+  "Description": "Cloudformation for deploying deep learning capabilities with Lambda",
   "Parameters": {
     "CIDRRange": {
       "Description": "VPCCIDR Range (will be a /16 block)",
@@ -280,6 +281,7 @@
       }
     },
     "NameLambda" : {
+      "DependsOn": [ "VGAIGWBase" ],
       "Type" : "AWS::Lambda::Function",
       "Properties": {
         "Description": "Determine nationality of file in S3 based on name",
