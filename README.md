@@ -5,7 +5,7 @@ Brief tutorial on developing a pipeline for deploying deep learning capabilities
 - Deploying deep learning algorithm on EC2
 - Setting up AWS lambda to read from and write to S3
 
-It's assumed that you have set up your VPCs, security groups, IAM roles, and environment in general.
+It's assumed that you have set up your VPCs, security groups, IAM roles, and environment in general.  A CloudFormation script is also provided in the ```cf``` directory.  If using that, please follow the instructions provided in that directory.
 
 
 ### Setting up EC2
