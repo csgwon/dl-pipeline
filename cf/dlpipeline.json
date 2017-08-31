@@ -1,24 +1,18 @@
 {
   "Description": "Cloudformation for deploying deep learning capabilities with Lambda",
   "Parameters": {
-    "CIDRRange": {
-      "Description": "VPCCIDR Range (will be a /16 block)",
-      "Type": "String",
-      "Default": "10.0.0.0",
-      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})"
-    },
     "ResourcePrefix": {
       "Description": "Prefix used for all resources in stack",
       "Type": "String",
       "Default": "DLPipeline"
     },
     "AllowedIP": {
-      "Description": "Whitelisted CIDR block for security group (must be of the form x.x.x.x)",
+      "Description": "Whitelisted IP for security group (must be of the form x.x.x.x)",
       "Type": "String",
       "MinLength": "9",
       "MaxLength": "18",
       "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})",
-      "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x"
+      "ConstraintDescription": "Must be a valid IP of the form x.x.x.x"
     },
     "KeyName": {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
@@ -42,8 +36,11 @@
     }
   },
   "Mappings": {
-    "VPCRanges": {
-      "10.0.0.0": {
+    "CIDRRanges": {
+      "VPC": {
+        "Main": "10.0.0.0/16"
+      },
+      "Subnets": {
         "PublicSubnet"   : "10.0.1.0/24"
       }
     },
@@ -57,7 +54,7 @@
     "VPCBase": {
       "Type": "AWS::EC2::VPC",
       "Properties": {
-        "CidrBlock": { "Fn::Join" : ["", [{ "Ref" : "CIDRRange" }, "/16"]] },
+        "CidrBlock": { "Fn::FindInMap" : [ "CIDRRanges", "VPC", "Main"] },
         "EnableDnsSupport": "True",
         "EnableDnsHostnames": "True",
         "Tags": [
@@ -72,7 +69,7 @@
         "GroupDescription": "Enable inbound network access access to EC2 instance.",
         "VpcId": { "Ref": "VPCBase" },
         "SecurityGroupIngress": [
-          {"IpProtocol": "tcp", "ToPort": "80", "FromPort": "80", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "CIDRRange"}, "/16"]] }},
+          {"IpProtocol": "tcp", "ToPort": "80", "FromPort": "80", "CidrIp": { "Fn::FindInMap" : [ "CIDRRanges", "VPC", "Main"] }},
           {"IpProtocol": "tcp", "ToPort": "80", "FromPort": "80", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "AllowedIP"}, "/32"]] }},
           {"IpProtocol": "tcp", "ToPort": "22", "FromPort": "22", "CidrIp": { "Fn::Join" : [ "", [{"Ref": "AllowedIP"}, "/32"]] }}
         ],
@@ -86,7 +83,7 @@
       "Type": "AWS::EC2::Subnet",
       "Properties": {
         "AvailabilityZone": { "Fn::Select": [ "0", { "Fn::GetAZs": { "Ref": "AWS::Region" } } ] },
-        "CidrBlock": { "Fn::FindInMap" : [ "VPCRanges", { "Ref": "CIDRRange"}, "PublicSubnet"] },
+        "CidrBlock": { "Fn::FindInMap" : [ "CIDRRanges", "Subnets", "PublicSubnet"] },
         "MapPublicIpOnLaunch": "True",
         "Tags": [
           { "Key": "Name", "Value": { "Fn::Join" : ["", [{ "Ref" : "ResourcePrefix" }, "-PublicSubnet"]] } },
